@@ -15,7 +15,11 @@ saved/
 collect_memes.py
 meme_collection_prompt_v2.md
 README_수집실행.md
-images
+/images
 web/static/images/
 web/static/data/
 dataset/*.md
+
+requirements.txt
+web/build_db.py
+web/server.py
