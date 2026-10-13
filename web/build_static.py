@@ -1,5 +1,7 @@
 """Build a portable GitHub Pages site from the existing database and images."""
 import json
+import os
+import html as html_module
 import shutil
 import unicodedata
 from pathlib import Path
@@ -12,11 +14,18 @@ def build():
     output = ROOT / "_site"
     output.mkdir(exist_ok=True)
     static = ROOT / "web/static"
-    for name in ("app.js", "style.css", "placeholder.png"):
+    for name in ("app.js", "uploads.js", "style.css", "placeholder.png"):
         shutil.copy2(static / name, output / name)
     html = (static / "index.html").read_text(encoding="utf-8")
     html = html.replace('<html lang="ko">', '<html lang="ko" data-static="true">')
+    api_base = os.getenv("MEMEWIKI_API_BASE", "").rstrip("/")
+    if api_base:
+        if not api_base.startswith("https://"):
+            raise ValueError("MEMEWIKI_API_BASE must be an HTTPS URL")
+        html = html.replace('data-static="true"', 'data-static="true" data-api-base="' +
+                            html_module.escape(api_base, quote=True) + '"')
     html = html.replace('/static/style.css', './style.css').replace('/static/app.js', './app.js')
+    html = html.replace('/static/uploads.js', './uploads.js')
     (output / "index.html").write_text(html, encoding="utf-8")
     db = json.loads((ROOT / "web/data/memes.json").read_text(encoding="utf-8"))
     sources = {"dataset": ROOT / "dataset/images", "llm": ROOT / "llm_run/llm collected"}

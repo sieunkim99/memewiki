@@ -20,6 +20,4 @@ web/static/images/
 web/static/data/
 dataset/*.md
 
-requirements.txt
 web/build_db.py
-web/server.py
