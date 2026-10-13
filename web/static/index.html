@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>밈 LLM Wiki | 상황·감정 기반 한국어 밈 위키 & AI 검색</title>
+  <meta name="description" content="상황과 감정을 말하면 어울리는 밈을 찾아주는 한국어 밈 LLM 위키. 노션 위키 카테고리 기반 427개 밈 데이터셋 검색 및 탐색.">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation -->
+  <nav class="navbar" id="main-nav">
+    <div class="nav-container">
+      <div class="nav-brand" id="nav-brand-logo">
+        <span class="brand-icon">⚡️</span>
+        <span class="brand-title">MEME LLM WIKI</span>
+        <span class="brand-badge" id="badge-total-count">427 MEMES</span>
+      </div>
+      <div class="nav-links">
+        <button class="nav-tab active" data-tab="browse" id="tab-btn-browse">밈 탐색</button>
+        <button class="nav-tab" data-tab="ai-search" id="tab-btn-ai">AI 상황 추천</button>
+        <button class="nav-tab" data-tab="emotions" id="tab-btn-emotions">감정별 (11)</button>
+        <button class="nav-tab" data-tab="situations" id="tab-btn-situations">상황별 (12)</button>
+        <button class="nav-tab" data-tab="stats" id="tab-btn-stats">위키 통계</button>
+      </div>
+      <div class="nav-actions">
+        <button class="btn btn-secondary btn-sm" id="btn-random-meme">
+          <span class="icon">🎲</span> 랜덤 밈
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section with AI Search -->
+  <header class="hero-section" id="hero-area">
+    <div class="hero-glow hero-glow-1"></div>
+    <div class="hero-glow hero-glow-2"></div>
+    <div class="hero-content">
+      <div class="hero-pill">
+        <span class="pulse-dot"></span> Notion 최종 카테고리 & 어노테이션 완비 427건
+      </div>
+      <h1 class="hero-title">
+        상황이나 감정을 말하면<br>
+        <span class="gradient-text">어울리는 밈을 찾아주는 위키</span>
+      </h1>
+      <p class="hero-desc">
+        11가지 감정, 12가지 상황, 수신인별 맞춤 추천까지. 대화와 일상에서 바로 쓰는 한국어 밈 아카이브.
+      </p>
+
+      <!-- Search Box -->
+      <div class="search-box-card" id="search-container">
+        <form id="ai-search-form" class="search-form">
+          <div class="search-input-wrapper">
+            <span class="search-icon">🔍</span>
+            <input 
+              type="text" 
+              id="search-input" 
+              placeholder="상황이나 기분을 편하게 입력해보세요 (예: 월요일 출근하기 싫을 때, 시험 망쳤는데 후회는 없을 때)" 
+              autocomplete="off"
+            >
+            <button type="button" class="clear-btn" id="btn-clear-search" style="display:none;">✕</button>
+          </div>
+          <button type="submit" class="btn btn-primary" id="btn-search-submit">
+            <span>AI 밈 추천</span>
+            <span class="arrow">→</span>
+          </button>
+        </form>
+
+        <!-- Quick Tags -->
+        <div class="quick-tags" id="quick-prompt-tags">
+          <span class="quick-label">추천 상황:</span>
+          <button class="quick-pill" data-query="월요일 출근하기 싫을 때">😴 월요일 출근</button>
+          <button class="quick-pill" data-query="시험 망쳤는데 후회는 없을 때">🤷‍♂️ 시험 망침·해탈</button>
+          <button class="quick-pill" data-query="친구가 귀여운 짓 했을 때">🥰 귀여움·심쿵</button>
+          <button class="quick-pill" data-query="정중하게 거절하거나 도망치고 싶을 때">🏃‍♂️ 거절·도망</button>
+          <button class="quick-pill" data-query="드디어 합격했거나 해냈을 때">🎉 성공·자신감</button>
+          <button class="quick-pill" data-query="주말이 순식간에 사라졌을 때">💨 주말 순삭</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="main-container">
+    <!-- Category Explorer Bar -->
+    <section class="filter-section" id="filter-panel">
+      <div class="filter-header">
+        <div class="filter-title-group">
+          <h2 class="section-title">밈 위키 아카이브</h2>
+          <span class="count-badge" id="results-count">427건 검색됨</span>
+        </div>
+        <div class="filter-controls">
+          <div class="filter-dropdown-group">
+            <select id="select-emotion" class="filter-select">
+              <option value="전체">모든 감정 (11종)</option>
+            </select>
+            <select id="select-situation" class="filter-select">
+              <option value="전체">모든 상황 (12종)</option>
+            </select>
+            <select id="select-recipient" class="filter-select">
+              <option value="전체">모든 수신인</option>
+            </select>
+            <select id="select-tier" class="filter-select">
+              <option value="전체">모든 수위</option>
+              <option value="전체">전체 공개</option>
+              <option value="친구·가족·동료">친구·가족·동료</option>
+              <option value="친한 사이(친구·연인)">친한 사이</option>
+            </select>
+            <select id="select-source" class="filter-select">
+              <option value="전체">모든 출처</option>
+              <option value="human_annotated">인간 검수 데이터셋 (362)</option>
+              <option value="llm_collected">LLM 신규 수집 (65)</option>
+            </select>
+          </div>
+          <button class="btn btn-outline btn-sm" id="btn-reset-filters">초기화</button>
+        </div>
+      </div>
+
+      <!-- Quick Category Chips -->
+      <div class="category-chips-row" id="quick-category-chips">
+        <!-- Dynamically injected category buttons -->
+      </div>
+    </section>
+
+    <!-- AI Recommendation Banner (visible when searching) -->
+    <div class="ai-banner" id="ai-banner" style="display: none;">
+      <div class="ai-banner-content">
+        <span class="ai-badge">AI 추천 결과</span>
+        <span class="ai-query-text" id="ai-query-display"></span>
+      </div>
+      <button class="btn btn-sm btn-ghost" id="btn-exit-ai">전체 보기로 돌아가기</button>
+    </div>
+
+    <!-- Meme Grid Gallery -->
+    <section class="gallery-section" id="meme-gallery">
+      <div class="meme-grid" id="meme-grid">
+        <!-- Cards loaded via JS -->
+      </div>
+
+      <!-- Loading Spinner -->
+      <div class="loading-state" id="loading-spinner" style="display: none;">
+        <div class="spinner"></div>
+        <p>밈 데이터를 불러오는 중...</p>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="empty-state" style="display: none;">
+        <span class="empty-icon">🔍</span>
+        <h3>일치하는 밈이 없습니다</h3>
+        <p>다른 검색어나 카테고리 필터를 선택해보세요.</p>
+        <button class="btn btn-primary btn-sm" id="btn-empty-reset">필터 전체 해제</button>
+      </div>
+
+      <!-- Pagination / Load More -->
+      <div class="pagination-wrapper" id="pagination-wrapper">
+        <button class="btn btn-secondary" id="btn-load-more">더 많은 밈 보기</button>
+      </div>
+    </section>
+
+    <!-- Stats View Section (Hidden by default, shown when Stats tab active) -->
+    <section class="stats-section" id="stats-section" style="display: none;">
+      <div class="stats-header">
+        <h2 class="section-title">📊 밈 LLM 위키 데이터셋 현황</h2>
+        <p class="section-subtitle">인간 어노테이션 362건과 LLM 자동수집 65건의 통합 통계 분석입니다.</p>
+      </div>
+
+      <div class="stats-card-grid">
+        <div class="stat-card">
+          <span class="stat-num" id="stat-total">427</span>
+          <span class="stat-label">총 밈 데이터</span>
+          <span class="stat-sub">이미지 100% 매칭</span>
+        </div>
+        <div class="stat-card highlight-blue">
+          <span class="stat-num" id="stat-human">362</span>
+          <span class="stat-label">인간 어노테이션</span>
+          <span class="stat-sub">정밀 검수 데이터셋</span>
+        </div>
+        <div class="stat-card highlight-purple">
+          <span class="stat-num" id="stat-llm">65</span>
+          <span class="stat-label">LLM 신규 수집</span>
+          <span class="stat-sub">Trend A Word 파이프라인</span>
+        </div>
+        <div class="stat-card highlight-green">
+          <span class="stat-num">100%</span>
+          <span class="stat-label">노션 분류 커버리지</span>
+          <span class="stat-sub">11감정 · 12상황 완비</span>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-box">
+          <h3 class="chart-title">감정 분류 분포 (11종)</h3>
+          <div class="bar-chart" id="chart-emotions"></div>
+        </div>
+        <div class="chart-box">
+          <h3 class="chart-title">상황 분류 분포 (12종)</h3>
+          <div class="bar-chart" id="chart-situations"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Meme Detail Modal -->
+  <div class="modal-overlay" id="meme-modal" style="display: none;">
+    <div class="modal-dialog">
+      <button class="modal-close-btn" id="modal-close" aria-label="닫기">✕</button>
+      <div class="modal-body" id="modal-content">
+        <!-- Rendered dynamically via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast-message"></div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-left">
+        <span class="footer-brand">⚡️ MEME LLM WIKI</span>
+        <span class="footer-desc">한국어 밈 데이터셋 어노테이션 & 상황별 밈 추천 위키</span>
+      </div>
+      <div class="footer-right">
+        <span>기존 데이터셋 (362) + LLM 수집 (65) = 총 427개 밈 구축 완료</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

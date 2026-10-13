@@ -1,0 +1,21 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.state/
+_site/
+saved/
+
+# Local collection sources are not part of the public website
+*.xlsx
+collect_memes.py
+meme_collection_prompt_v2.md
+README_수집실행.md
+images
+web/static/images/
+web/static/data/
+dataset/*.md
