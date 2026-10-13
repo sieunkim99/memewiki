@@ -4,6 +4,9 @@
  */
 
 // Application State
+const API_BASE = (document.documentElement.dataset.apiBase || '').replace(/\/$/, '');
+let recommendationController = null;
+
 const state = {
   currentTab: 'browse',
   page: 1,
@@ -72,6 +75,7 @@ const DOM = {
 // Image URL formatter (supports GitHub Pages relative paths)
 function formatImageUrl(url) {
   if (!url) return './placeholder.png';
+  if (API_BASE && state.apiDatabase && url.startsWith('/images/')) return API_BASE + url;
   if (state.isStaticMode || window.location.hostname.includes('github.io')) {
     if (url.startsWith('/images/')) {
       return './images/' + url.slice(8);
@@ -83,12 +87,14 @@ function formatImageUrl(url) {
 // Check or load static DB fallback
 async function loadStaticDbIfNeeded() {
   if (state.rawDb) return state.rawDb;
-  const paths = ['./data/memes.json', '/static/data/memes.json', 'data/memes.json'];
+  const paths = [...(!state.isStaticMode || API_BASE ? [API_BASE + '/api/database'] : []),
+    './data/memes.json', '/static/data/memes.json', 'data/memes.json'];
   for (const p of paths) {
     try {
       const res = await fetch(p);
       if (res.ok) {
         state.rawDb = await res.json();
+        state.apiDatabase = p === API_BASE + '/api/database';
         state.isStaticMode = true;
         return state.rawDb;
       }
@@ -100,10 +106,28 @@ async function loadStaticDbIfNeeded() {
 // Initialization
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
+  setupUpload();
+  updateAiStatus();
+  await loadStaticDbIfNeeded();
   await loadCategories();
   await loadStats();
   await fetchMemes(true);
 });
+
+async function updateAiStatus() {
+  const status = document.getElementById('ai-service-status');
+  try {
+    if (document.documentElement.dataset.static === 'true' && !API_BASE) {
+      throw new Error('AI 검색 서버 미연결');
+    }
+    const response = await fetch(API_BASE + '/api/ai-status');
+    if (!response.ok) throw new Error('AI 검색 서버에 연결할 수 없습니다.');
+    const data = await response.json();
+    status.textContent = data.enabled ? 'AI 검색 연결됨 · 검색어는 OpenAI로 전송됩니다.' : 'AI 검색 미연결 · 서버에 API 키가 필요합니다.';
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
 
 // Event Listeners
 function setupEventListeners() {
@@ -228,7 +252,10 @@ function setupEventListeners() {
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') {
+      if (document.getElementById('upload-modal').style.display !== 'none') closeUpload();
+      else closeModal();
+    }
   });
 }
 
@@ -463,7 +490,7 @@ function renderMemeCards(memes, clear = false) {
   memes.forEach(m => {
     const card = document.createElement('div');
     card.className = 'meme-card';
-    card.id = `meme-card-${m.idx}`;
+    card.id = `meme-card-${m.id}`;
 
     const isLlm = m.source_type === 'llm_collected';
     const imgUrl = formatImageUrl(m.image_url);
@@ -471,10 +498,10 @@ function renderMemeCards(memes, clear = false) {
     card.innerHTML = `
       <div class="card-img-wrap">
         <div class="card-badges">
-          <span class="badge-pill ${isLlm ? 'llm' : ''}">${isLlm ? 'LLM수집' : '인간검수'}</span>
+          <span class="badge-pill ${isLlm ? 'llm' : ''}">${m.source_type === 'user_uploaded' ? '사용자 업로드' : isLlm ? 'LLM수집' : '인간검수'}</span>
           <span class="badge-pill">${m.tier}</span>
         </div>
-        <img class="card-img" src="${imgUrl}" alt="${m.title}" loading="lazy" onerror="this.src='./placeholder.png';">
+        <img class="card-img" src="${escapeHtml(imgUrl)}" alt="${escapeHtml(m.title)}" loading="lazy" onerror="this.src='./placeholder.png';">
       </div>
       <div class="card-body">
         <h3 class="card-situation">${escapeHtml(m.situation || m.title)}</h3>
@@ -494,8 +521,11 @@ function renderMemeCards(memes, clear = false) {
   });
 }
 
-// AI Recommendation Execution (Supports both API & Static Client-side search)
+// Recommendations always come from the AI service.
 async function executeAiRecommendation(query) {
+  if (recommendationController) recommendationController.abort();
+  const controller = new AbortController();
+  recommendationController = controller;
   state.isAiMode = true;
   state.aiQuery = query;
 
@@ -505,93 +535,25 @@ async function executeAiRecommendation(query) {
   DOM.memeGrid.innerHTML = '';
 
   DOM.aiBanner.style.display = 'flex';
-  DOM.aiQueryDisplay.textContent = `"${query}" 상황에 가장 적합한 밈을 분석했습니다.`;
+  DOM.aiQueryDisplay.textContent = `"${query}" 상황을 AI가 분석하고 있습니다...`;
+  DOM.resultsCount.textContent = 'AI 검색 중...';
 
   try {
-    let data = null;
-    if (!state.isStaticMode) {
-      try {
-        const res = await fetch('/api/recommend', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: query, top_k: 12 })
-        });
-        if (res.ok) data = await res.json();
-      } catch (e) {}
+    if (document.documentElement.dataset.static === 'true' && !API_BASE) {
+      throw new Error('AI 검색 서버가 아직 연결되지 않았습니다.');
     }
-
-    // Static client-side AI recommendation algorithm
-    if (!data) {
-      const db = await loadStaticDbIfNeeded();
-      if (db && db.memes) {
-        const qLower = query.toLowerCase();
-        const tokens = qLower.split(/[\s,.\?!]+/).filter(t => t.length >= 1);
-
-        const scored = [];
-        db.memes.forEach(m => {
-          let score = 0;
-          const reasons = [];
-
-          (m.keywords || []).forEach(kw => {
-            const kwLow = kw.toLowerCase();
-            if (kwLow === qLower) {
-              score += 15;
-              reasons.push(`키워드 '${kw}' 일치`);
-            } else if (tokens.some(tok => tok.length >= 2 && kwLow.includes(tok))) {
-              score += 10;
-              reasons.push(`키워드 '${kw}' 연관`);
-            }
-          });
-
-          const sitLow = (m.situation || '').toLowerCase();
-          const sitMatches = tokens.filter(tok => tok.length >= 2 && sitLow.includes(tok));
-          if (sitMatches.length > 0) {
-            score += 10 * sitMatches.length;
-            reasons.push(`상황 연관: ${sitMatches.slice(0, 2).join(', ')}`);
-          }
-
-          (m.examples || []).forEach(ex => {
-            const exMatches = tokens.filter(tok => tok.length >= 2 && ex.toLowerCase().includes(tok));
-            if (exMatches.length > 0) {
-              score += 8;
-              reasons.push(`예시 상황 일치: '${ex.slice(0, 20)}...'`);
-            }
-          });
-
-          (m.category_emotion || '').split('·').forEach(emo => {
-            if (qLower.includes(emo)) {
-              score += 14;
-              reasons.push(`감정 '${emo}' 일치`);
-            }
-          });
-
-          (m.category_situation || '').split('·').forEach(sit => {
-            if (qLower.includes(sit)) {
-              score += 14;
-              reasons.push(`상황 분류 '${sit}' 일치`);
-            }
-          });
-
-          if (score > 0) {
-            const confidence = Math.min(99, Math.floor(score * 2.2 + 35));
-            scored.push({
-              meme: m,
-              confidence: confidence,
-              reason: reasons[0] || '상황 맥락 일치'
-            });
-          }
-        });
-
-        scored.sort((a, b) => b.confidence - a.confidence);
-        data = {
-          query: query,
-          count: Math.min(12, scored.length),
-          recommendations: scored.slice(0, 12)
-        };
-      }
+    const response = await fetch(API_BASE + '/api/recommend', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, top_k: 12 }), signal: controller.signal
+    });
+    if (!response.headers.get('content-type')?.includes('application/json')) {
+      throw new Error('AI 검색 서버에 연결할 수 없습니다.');
     }
-
-    if (!data) throw new Error('Recommendation failed');
+    const data = await response.json();
+    if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'AI 검색에 실패했습니다.');
+    if (controller.signal.aborted) return;
+    if (data.mode !== 'llm') throw new Error('AI 검색 응답을 확인할 수 없습니다.');
+    DOM.aiQueryDisplay.textContent = data.interpretation;
 
     DOM.resultsCount.textContent = `AI 맞춤 추천 ${data.count}건`;
 
@@ -611,10 +573,10 @@ async function executeAiRecommendation(query) {
       card.innerHTML = `
         <div class="card-img-wrap">
           <div class="card-badges">
-            <span class="badge-pill confidence">${item.confidence}% 일치</span>
+            <span class="badge-pill confidence">LLM 추천</span>
             <span class="badge-pill">${m.category_situation}</span>
           </div>
-          <img class="card-img" src="${imgUrl}" alt="${m.title}" loading="lazy" onerror="this.src='./placeholder.png';">
+          <img class="card-img" src="${escapeHtml(imgUrl)}" alt="${escapeHtml(m.title)}" loading="lazy" onerror="this.src='./placeholder.png';">
         </div>
         <div class="card-body">
           <h3 class="card-situation">${escapeHtml(m.situation)}</h3>
@@ -637,14 +599,21 @@ async function executeAiRecommendation(query) {
     });
 
   } catch (e) {
+    if (controller.signal.aborted) return;
     console.error('AI Recommendation Error:', e);
-    showToast('AI 추천 검색 중 오류가 발생했습니다.');
+    DOM.aiQueryDisplay.textContent = e.message || 'AI 검색에 실패했습니다. 다시 시도해주세요.';
+    DOM.resultsCount.textContent = 'AI 검색 실패';
+    showToast(DOM.aiQueryDisplay.textContent);
   } finally {
-    DOM.loadingSpinner.style.display = 'none';
+    if (recommendationController === controller) {
+      DOM.loadingSpinner.style.display = 'none';
+      recommendationController = null;
+    }
   }
 }
 
 function exitAiMode() {
+  if (recommendationController) recommendationController.abort();
   state.isAiMode = false;
   state.aiQuery = '';
   DOM.aiBanner.style.display = 'none';
@@ -655,6 +624,7 @@ function exitAiMode() {
 
 // Reset Filters
 function resetFilters() {
+  if (recommendationController) recommendationController.abort();
   state.filters = {
     q: '',
     emotion: '전체',
@@ -722,7 +692,7 @@ async function openModal(memeId) {
 
     const relatedHtml = related.map(rel => `
       <div class="related-thumb-card" data-rel-id="${escapeHtml(rel.id)}">
-        <img class="related-thumb-img" src="${formatImageUrl(rel.image_url)}" alt="${rel.title}" loading="lazy" onerror="this.src='./placeholder.png';">
+        <img class="related-thumb-img" src="${escapeHtml(formatImageUrl(rel.image_url))}" alt="${escapeHtml(rel.title)}" loading="lazy" onerror="this.src='./placeholder.png';">
         <div class="related-thumb-title">${escapeHtml(rel.title)}</div>
       </div>
     `).join('');
@@ -732,7 +702,7 @@ async function openModal(memeId) {
         <!-- Image Column -->
         <div class="modal-img-col">
           <div class="modal-img-wrap">
-            <img class="modal-img" id="detail-modal-img" src="${imgUrl}" alt="${m.title}" onerror="this.src='./placeholder.png';">
+            <img class="modal-img" id="detail-modal-img" src="${escapeHtml(imgUrl)}" alt="${escapeHtml(m.title)}" onerror="this.src='./placeholder.png';">
           </div>
           <div class="modal-img-actions">
             <button class="btn btn-secondary btn-sm" id="btn-copy-image-url" style="flex:1;">
@@ -872,6 +842,7 @@ async function loadStats() {
     DOM.statTotal.textContent = data.total_count;
     DOM.statHuman.textContent = data.human_count;
     DOM.statLlm.textContent = data.llm_count;
+    document.getElementById('stat-uploads').textContent = data.upload_count || 0;
     DOM.badgeTotal.textContent = `${data.total_count} MEMES`;
 
     renderBarChart(DOM.chartEmotions, data.emotions, data.total_count);

@@ -30,6 +30,7 @@
         <button class="nav-tab" data-tab="stats" id="tab-btn-stats">위키 통계</button>
       </div>
       <div class="nav-actions">
+        <button class="btn btn-primary btn-sm" id="btn-add-meme">이미지 등록</button>
         <button class="btn btn-secondary btn-sm" id="btn-random-meme">
           <span class="icon">🎲</span> 랜덤 밈
         </button>
@@ -71,6 +72,7 @@
             <span class="arrow">→</span>
           </button>
         </form>
+        <p id="ai-service-status" class="ai-service-status" role="status">AI 검색 연결 확인 중...</p>
 
         <!-- Quick Tags -->
         <div class="quick-tags" id="quick-prompt-tags">
@@ -116,6 +118,7 @@
               <option value="전체">모든 출처</option>
               <option value="human_annotated">인간 검수 데이터셋 (362)</option>
               <option value="llm_collected">LLM 신규 수집 (65)</option>
+              <option value="user_uploaded">사용자 업로드 · AI 분석</option>
             </select>
           </div>
           <button class="btn btn-outline btn-sm" id="btn-reset-filters">초기화</button>
@@ -172,6 +175,11 @@
 
       <div class="stats-card-grid">
         <div class="stat-card">
+          <span class="stat-num" id="stat-uploads">0</span>
+          <span class="stat-label">사용자 업로드 · AI 분석</span>
+          <span class="stat-sub">미검수</span>
+        </div>
+        <div class="stat-card">
           <span class="stat-num" id="stat-total">427</span>
           <span class="stat-label">총 밈 데이터</span>
           <span class="stat-sub">이미지 100% 매칭</span>
@@ -207,6 +215,28 @@
   </main>
 
   <!-- Meme Detail Modal -->
+  <div class="modal-overlay" id="upload-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="upload-title">
+    <div class="modal-dialog upload-dialog">
+      <button class="modal-close-btn" id="upload-close" aria-label="닫기">✕</button>
+      <form id="upload-form" class="modal-body">
+        <h2 id="upload-title">밈 이미지 등록</h2>
+        <label class="upload-dropzone" id="upload-dropzone" for="upload-file">
+          <span>이미지 선택</span>
+          <span class="upload-file-types">최대 5장 · JPG · PNG · WebP · 장당 10MB</span>
+          <input id="upload-file" name="files" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+        </label>
+        <p class="upload-consent">분석할 이미지는 OpenAI로 전송됩니다. 최종 저장한 이미지와 내용만 위키에 공개됩니다.</p>
+        <p id="upload-status" role="status" aria-live="polite"></p>
+        <div id="upload-items" class="upload-items"></div>
+        <div class="upload-actions">
+          <button type="button" id="upload-discard" class="btn btn-outline">모두 취소</button>
+          <button type="button" id="upload-analyze" class="btn btn-secondary" disabled>선택 이미지 분석</button>
+          <button type="submit" id="upload-submit" class="btn btn-primary" disabled>확인한 내용 저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="meme-modal" style="display: none;">
     <div class="modal-dialog">
       <button class="modal-close-btn" id="modal-close" aria-label="닫기">✕</button>
@@ -233,5 +263,6 @@
   </footer>
 
   <script src="/static/app.js"></script>
+  <script src="/static/uploads.js"></script>
 </body>
 </html>
